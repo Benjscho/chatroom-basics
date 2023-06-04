@@ -1,5 +1,9 @@
+use crate::{Result, Client};
 use serde::{Deserialize, Serialize};
-use warp::Reply;
+use uuid::Uuid;
+use warp::{http::StatusCode, Reply, ws::Message, reply::json};
+
+use crate::Clients;
 
 
 #[derive(Deserialize, Debug)]
@@ -9,7 +13,7 @@ pub struct RegisterRequest {
 
 #[derive(Serialize, Debug)]
 pub struct RegisterResponse {
-    url: usize
+    url: String
 }
 
 #[derive(Deserialize, Debug)]
@@ -20,5 +24,53 @@ pub struct Event {
 }
 
 pub async fn publish_handler(body: Event, clients: Clients) -> Result<impl Reply> {
+    clients
+        .read()
+        .await
+        .iter()
+        .filter(|(_, client)| match body.user_id {
+            Some(v) => client.user_id == v,
+            None => true,
+        })
+        .filter(|(_, client)| client.topics.contains(&body.topic))
+        .for_each(|(_, client)| {
+            if let Some(sender) = &client.sender {
+                let _ = sender.send(Ok(Message::text(body.message.clone())));
+            }
+        });
 
+    Ok(StatusCode::OK)
 }
+
+pub async fn register_handler(body: RegisterRequest, clients: Clients) -> Result<impl Reply> {
+    let user_id = body.user_id;
+    let uuid = Uuid::new_v4().as_simple().to_string();
+
+    register_client(uuid.clone(), user_id, clients).await;
+    Ok(json(&RegisterResponse {
+        // TODO: parameterise endpoint and port
+        url: format!("ws://127.0.0.1:8000/ws/{}", uuid),
+    }))
+}
+
+/// Register a client to the server.
+async fn register_client(id: String, user_id: usize, clients: Clients) {
+    clients.write().await.insert(
+        id, 
+        Client { 
+            user_id, 
+            // TODO: Parameterise init topic 
+            topics: vec![String::from("general")], sender: None 
+        }
+    );
+}
+
+pub async fn unregister_handler(id: String, clients: Clients) -> Result<impl Reply> {
+    clients.write().await.remove(&id);
+    Ok(StatusCode::OK)
+}
+
+pub async fn health_handler() -> Result<impl Reply> {
+    Ok(StatusCode::OK)
+}
+
