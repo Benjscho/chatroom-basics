@@ -3,8 +3,8 @@ use std::{sync::Arc, collections::HashMap};
 use tokio::sync::{RwLock, mpsc};
 use warp::{Rejection, ws::Message, Filter};
 
-mod server;
 mod handler;
+mod ws;
 
 type Result<T> = std::result::Result<T, Rejection>;
 type Clients = Arc<RwLock<HashMap<String, Client>>>;

@@ -56,11 +56,11 @@ pub async fn register_handler(body: RegisterRequest, clients: Clients) -> Result
 /// Register a client to the server.
 async fn register_client(id: String, user_id: usize, clients: Clients) {
     clients.write().await.insert(
-        id, 
-        Client { 
-            user_id, 
-            // TODO: Parameterise init topic 
-            topics: vec![String::from("general")], sender: None 
+        id,
+        Client {
+            user_id,
+            // TODO: Parameterise init topic
+            topics: vec![String::from("general")], sender: None
         }
     );
 }
@@ -70,7 +70,13 @@ pub async fn unregister_handler(id: String, clients: Clients) -> Result<impl Rep
     Ok(StatusCode::OK)
 }
 
+pub async fn ws_handler(ws: warp::ws::Ws, id: String, clients: Clients) -> Result<impl Reply> {
+    let client = clients.read().await.get(&id).cloned();
+    match client {
+        Some(c) => Ok(ws.on_upgrade(move |socket| ws::client_connection(socket)))
+    }
+}
+
 pub async fn health_handler() -> Result<impl Reply> {
     Ok(StatusCode::OK)
 }
-
