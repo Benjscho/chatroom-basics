@@ -1,4 +1,4 @@
-use crate::{Result, Client};
+use crate::{Result, Client, ws};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use warp::{http::StatusCode, Reply, ws::Message, reply::json};
@@ -73,7 +73,8 @@ pub async fn unregister_handler(id: String, clients: Clients) -> Result<impl Rep
 pub async fn ws_handler(ws: warp::ws::Ws, id: String, clients: Clients) -> Result<impl Reply> {
     let client = clients.read().await.get(&id).cloned();
     match client {
-        Some(c) => Ok(ws.on_upgrade(move |socket| ws::client_connection(socket)))
+        Some(c) => Ok(ws.on_upgrade(move |socket| ws::client_connection(socket, id, clients, c))),
+        None => Err(warp::reject::not_found())
     }
 }
 
